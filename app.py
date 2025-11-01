@@ -89,10 +89,9 @@ class MusicRecommender:
         return " ".join(stems)
 
     def load_model(self):
-        with open('df.pkl', 'rb') as f:
-            self.df = pickle.load(f)
-        with open('similarity.pkl', 'rb') as f:
+        with open('small_similarity.pkl', 'rb') as f:
             self.similarity = pickle.load(f)
+        self.df = pd.read_csv('small_spotify_sample.csv', on_bad_lines='skip', engine='python')
 
     def recommend(self, song_name, n=5):
         if song_name not in self.df['song'].values:
