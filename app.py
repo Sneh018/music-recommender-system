@@ -27,7 +27,7 @@ def get_song_album_cover_url(song_name, artist_name):
 
 # ----------------- MUSIC RECOMMENDER -----------------
 class MusicRecommender:
-    def __init__(self, csv_path="spotify_millsongdata.csv"):
+    def __init__(self, csv_path="small_spotify_sample.csv"):
         self.df = None
         self.similarity = None
         self.stemmer = PorterStemmer()
