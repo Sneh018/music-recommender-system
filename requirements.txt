@@ -1,0 +1,5 @@
+streamlit
+spotipy
+pandas
+scikit-learn
+nltk
