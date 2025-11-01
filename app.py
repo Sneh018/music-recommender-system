@@ -47,7 +47,7 @@ class MusicRecommender:
         if not os.path.exists(csv_path):
             st.error(f"CSV file '{csv_path}' not found!")
             return
-        self.df = pd.read_csv(csv_path)
+        self.df = pd.read_csv(csv_path, on_bad_lines='skip', engine='python')
         # Drop extra columns if exist
         if 'link' in self.df.columns:
             self.df = self.df.drop('link', axis=1)
