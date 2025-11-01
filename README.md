@@ -10,7 +10,7 @@ It suggests similar songs based on lyrical similarity using TF-IDF vectorization
 - Lightweight sample dataset (`small_spotify_sample.csv`) for fast demos.  
 
 # 🧠 Tech Stack
-Python, Streamlit, Spotipy, scikit-learn, nltk, pandas`
+Python, Streamlit, Spotipy, scikit-learn, nltk, pandas
 
 # 🖥️ How to Run
 ```bash
