@@ -19,12 +19,20 @@ client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID, clien
 sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
 def get_song_album_cover_url(song_name, artist_name):
-    search_query = f"track:{song_name} artist:{artist_name}"
-    results = sp.search(q=search_query, type="track")
-    if results and results["tracks"]["items"]:
-        track = results["tracks"]["items"][0]
-        return track["album"]["images"][0]["url"]
-    else:
+    try:
+        # Try with both song + artist first
+        search_query = f"track:{song_name} artist:{artist_name}"
+        results = sp.search(q=search_query, type="track", limit=1)
+        
+        # If not found, retry with just the song name
+        if not results["tracks"]["items"]:
+            results = sp.search(q=f"track:{song_name}", type="track", limit=1)
+
+        if results and results["tracks"]["items"]:
+            return results["tracks"]["items"][0]["album"]["images"][0]["url"]
+        else:
+            return "https://i.postimg.cc/0QNxYz4V/social.png"
+    except Exception:
         return "https://i.postimg.cc/0QNxYz4V/social.png"
 
 # ----------------- MUSIC RECOMMENDER -----------------
