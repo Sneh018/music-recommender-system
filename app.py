@@ -1,4 +1,17 @@
 import streamlit as st
+# Fix for mobile "Invalid regular expression" error in Streamlit
+st.set_page_config(page_title="🎵 Music Recommender System", layout="wide")
+
+# Disable Streamlit’s markdown regex transformations on mobile
+st.markdown("""
+<style>
+/* Prevent mobile regex parsing error */
+a, code, pre {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+</style>
+""", unsafe_allow_html=True)
 import pandas as pd
 import nltk
 from nltk.stem.porter import PorterStemmer
