@@ -1,4 +1,3 @@
-# ✅ app.py — Final Streamlit Cloud Fix (punkt_tab issue solved)
 import streamlit as st
 import pandas as pd
 import nltk
