@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import nltk
 from nltk.stem.porter import PorterStemmer
+from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
@@ -9,7 +10,8 @@ import os
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 
-# ----------------- PAGE CONFIG -----------------
+
+# ----------------- STREAMLIT PAGE CONFIG -----------------
 st.set_page_config(page_title="🎵 Music Recommender System", layout="wide")
 st.markdown("""
 <style>
@@ -17,8 +19,13 @@ code, pre { white-space: pre-wrap; word-break: break-word; }
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------- NLTK SETUP -----------------
-nltk.download('punkt', quiet=True)
+
+# ----------------- NLTK SETUP (safe for Streamlit Cloud) -----------------
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
 
 # ----------------- SPOTIFY CONFIG -----------------
 CLIENT_ID = "70a9fb89662f4dac8d07321b259eaad7"
@@ -27,14 +34,13 @@ client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID, clien
 sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
 
-# ----------------- ALBUM COVER FUNCTION -----------------
 def get_song_album_cover_url(song_name, artist_name):
-    """Fetch album cover from Spotify API, fallback if not found."""
+    """Fetch album cover from Spotify API; fallback if not found."""
     try:
         search_query = f"track:{song_name} artist:{artist_name}"
         results = sp.search(q=search_query, type="track", limit=1)
 
-        # Retry with just song name if nothing found
+        # Retry with just the song name if nothing found
         if not results["tracks"]["items"]:
             results = sp.search(q=f"track:{song_name}", type="track", limit=1)
 
@@ -46,32 +52,33 @@ def get_song_album_cover_url(song_name, artist_name):
         return "https://i.postimg.cc/0QNxYz4V/social.png"
 
 
-# ----------------- MUSIC RECOMMENDER CLASS -----------------
+# ----------------- MUSIC RECOMMENDER -----------------
 class MusicRecommender:
     def __init__(self, csv_path="small_spotify_sample.csv"):
         self.df = None
         self.similarity = None
         self.stemmer = PorterStemmer()
 
-        # Check if preprocessed model exists
+        # Load preprocessed data if available
         if os.path.exists('df.pkl') and os.path.exists('similarity.pkl'):
             self.load_model()
         else:
             self.preprocess(csv_path)
 
     def preprocess(self, csv_path):
-        """Load and preprocess dataset, then compute similarity matrix."""
+        """Load, clean, and preprocess dataset."""
         if not os.path.exists(csv_path):
             st.error(f"CSV file '{csv_path}' not found!")
             return
 
+        st.info("📂 Loading and processing dataset...")
         self.df = pd.read_csv(csv_path, on_bad_lines='skip', engine='python')
 
         # Drop 'link' column if exists
         if 'link' in self.df.columns:
             self.df = self.df.drop('link', axis=1)
 
-        # Sample dataset for performance
+        # Sample subset for performance
         if len(self.df) > 5000:
             self.df = self.df.sample(5000, random_state=42).reset_index(drop=True)
 
@@ -80,35 +87,44 @@ class MusicRecommender:
         self.df['text'] = self.df['text'].replace(r'\n', ' ', regex=True)
         self.df['text'] = self.df['text'].replace(r'[^\w\s]', ' ', regex=True)
 
-        # Tokenize and stem
+        # Tokenize + stem
         self.df['text'] = self.df['text'].apply(self.tokenize_and_stem)
 
-        # TF-IDF + cosine similarity
+        # TF-IDF vectorization
         tfidf_vectorizer = TfidfVectorizer(analyzer='word', stop_words='english', max_features=5000)
         tfidf_matrix = tfidf_vectorizer.fit_transform(self.df['text'])
         self.similarity = cosine_similarity(tfidf_matrix)
 
-        # Save for reuse
+        # Save preprocessed data
         with open('df.pkl', 'wb') as f:
             pickle.dump(self.df, f)
         with open('similarity.pkl', 'wb') as f:
             pickle.dump(self.similarity, f)
 
+        st.success("✅ Dataset processed successfully!")
+
     def tokenize_and_stem(self, txt):
-        """Tokenize text and apply stemming."""
-        tokens = nltk.word_tokenize(str(txt))
+        """Tokenize text safely (fix for Streamlit Cloud)."""
+        try:
+            tokens = word_tokenize(str(txt))
+        except LookupError:
+            nltk.download('punkt')
+            tokens = word_tokenize(str(txt))
+        except Exception:
+            tokens = str(txt).split()
+
         stems = [self.stemmer.stem(t) for t in tokens if t.isalpha()]
         return " ".join(stems)
 
     def load_model(self):
-        """Load preprocessed pickled data."""
+        """Load preprocessed data and similarity matrix."""
         with open('similarity.pkl', 'rb') as f:
             self.similarity = pickle.load(f)
         with open('df.pkl', 'rb') as f:
             self.df = pickle.load(f)
 
     def recommend(self, song_name, n=5):
-        """Recommend similar songs using cosine similarity."""
+        """Return top-N song recommendations."""
         if song_name not in self.df['song'].values:
             return [], []
 
@@ -125,21 +141,20 @@ class MusicRecommender:
         return recommended_names, recommended_posters
 
 
-# ----------------- STREAMLIT FRONTEND -----------------
+# ----------------- STREAMLIT UI -----------------
 st.header("🎶 Music Recommender System")
-st.markdown("##### Get personalized song recommendations based on lyrical similarity and Spotify album art 🎧")
+st.markdown("##### Get personalized song suggestions based on lyrics and Spotify visuals 🎧")
 
-# Initialize recommender
 recommender = MusicRecommender()
-
 song_list = recommender.df['song'].values if recommender.df is not None else []
+
 selected_song = st.selectbox("🎵 Choose or type a song", song_list)
 
 if st.button("Show Recommendations"):
     names, posters = recommender.recommend(selected_song)
     if names:
-        cols = st.columns(5)
-        for i, col in enumerate(cols[:len(names)]):
+        cols = st.columns(len(names))
+        for i, col in enumerate(cols):
             with col:
                 st.text(names[i])
                 st.image(posters[i])
