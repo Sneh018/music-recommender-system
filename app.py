@@ -1,3 +1,4 @@
+# ✅ app.py — Final Streamlit Cloud Fix (punkt_tab issue solved)
 import streamlit as st
 import pandas as pd
 import nltk
@@ -10,7 +11,6 @@ import os
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 
-
 # ----------------- STREAMLIT PAGE CONFIG -----------------
 st.set_page_config(page_title="🎵 Music Recommender System", layout="wide")
 st.markdown("""
@@ -19,13 +19,15 @@ code, pre { white-space: pre-wrap; word-break: break-word; }
 </style>
 """, unsafe_allow_html=True)
 
-
 # ----------------- NLTK SETUP (safe for Streamlit Cloud) -----------------
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
     nltk.download('punkt')
-
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab')
 
 # ----------------- SPOTIFY CONFIG -----------------
 CLIENT_ID = "70a9fb89662f4dac8d07321b259eaad7"
@@ -39,11 +41,8 @@ def get_song_album_cover_url(song_name, artist_name):
     try:
         search_query = f"track:{song_name} artist:{artist_name}"
         results = sp.search(q=search_query, type="track", limit=1)
-
-        # Retry with just the song name if nothing found
         if not results["tracks"]["items"]:
             results = sp.search(q=f"track:{song_name}", type="track", limit=1)
-
         if results and results["tracks"]["items"]:
             return results["tracks"]["items"][0]["album"]["images"][0]["url"]
         else:
@@ -59,7 +58,6 @@ class MusicRecommender:
         self.similarity = None
         self.stemmer = PorterStemmer()
 
-        # Load preprocessed data if available
         if os.path.exists('df.pkl') and os.path.exists('similarity.pkl'):
             self.load_model()
         else:
@@ -74,28 +72,22 @@ class MusicRecommender:
         st.info("📂 Loading and processing dataset...")
         self.df = pd.read_csv(csv_path, on_bad_lines='skip', engine='python')
 
-        # Drop 'link' column if exists
         if 'link' in self.df.columns:
             self.df = self.df.drop('link', axis=1)
 
-        # Sample subset for performance
         if len(self.df) > 5000:
             self.df = self.df.sample(5000, random_state=42).reset_index(drop=True)
 
-        # Clean text
         self.df['text'] = self.df['text'].fillna("").str.lower()
         self.df['text'] = self.df['text'].replace(r'\n', ' ', regex=True)
         self.df['text'] = self.df['text'].replace(r'[^\w\s]', ' ', regex=True)
 
-        # Tokenize + stem
         self.df['text'] = self.df['text'].apply(self.tokenize_and_stem)
 
-        # TF-IDF vectorization
         tfidf_vectorizer = TfidfVectorizer(analyzer='word', stop_words='english', max_features=5000)
         tfidf_matrix = tfidf_vectorizer.fit_transform(self.df['text'])
         self.similarity = cosine_similarity(tfidf_matrix)
 
-        # Save preprocessed data
         with open('df.pkl', 'wb') as f:
             pickle.dump(self.df, f)
         with open('similarity.pkl', 'wb') as f:
@@ -104,11 +96,12 @@ class MusicRecommender:
         st.success("✅ Dataset processed successfully!")
 
     def tokenize_and_stem(self, txt):
-        """Tokenize text safely (fix for Streamlit Cloud)."""
+        """Tokenize text safely — fixes punkt_tab LookupError."""
         try:
             tokens = word_tokenize(str(txt))
         except LookupError:
             nltk.download('punkt')
+            nltk.download('punkt_tab')
             tokens = word_tokenize(str(txt))
         except Exception:
             tokens = str(txt).split()
@@ -117,14 +110,12 @@ class MusicRecommender:
         return " ".join(stems)
 
     def load_model(self):
-        """Load preprocessed data and similarity matrix."""
         with open('similarity.pkl', 'rb') as f:
             self.similarity = pickle.load(f)
         with open('df.pkl', 'rb') as f:
             self.df = pickle.load(f)
 
     def recommend(self, song_name, n=5):
-        """Return top-N song recommendations."""
         if song_name not in self.df['song'].values:
             return [], []
 
